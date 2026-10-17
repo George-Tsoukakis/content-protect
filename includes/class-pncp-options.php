@@ -233,6 +233,31 @@ final class PNCP_Options {
 	}
 
 	/**
+	 * An "always allowed" entry: the User-Agent part and the IPs it is accepted from.
+	 * "Skroutz" = from any IP; "Skroutz@203.0.113.0/24, 198.51.100.7" = only from these addresses.
+	 * Invalid IPs are ignored; an entry with "@" but no valid IP is never accepted.
+	 *
+	 * @param string $entry Entry of the list.
+	 * @return array{ua:string, ips:string[], pinned:bool}
+	 */
+	public static function split_allow_entry( $entry ) {
+		$parts = explode( '@', (string) $entry, 2 );
+		$ips   = array();
+		if ( isset( $parts[1] ) ) {
+			foreach ( preg_split( '/[\s,]+/', $parts[1] ) as $range ) {
+				if ( PNCP_Ip::valid_range( $range ) ) {
+					$ips[] = $range;
+				}
+			}
+		}
+		return array(
+			'ua'     => trim( $parts[0] ),
+			'ips'    => $ips,
+			'pinned' => isset( $parts[1] ),
+		);
+	}
+
+	/**
 	 * The default list as text.
 	 *
 	 * @return string
@@ -244,6 +269,7 @@ final class PNCP_Options {
 	/**
 	 * User-Agents that always pass the list check and the "browser headers" check (link previews, price
 	 * platforms, monitoring). The User-Agent can be spoofed, so the page limit still applies to them as usual.
+	 * An entry can be tied to IPs with "@": "Skroutz@203.0.113.0/24, 198.51.100.7" (see split_allow_entry()).
 	 *
 	 * @return string
 	 */
@@ -269,7 +295,7 @@ final class PNCP_Options {
 			'block_selection'         => 1,
 			'block_context_menu'      => 1,
 			'block_shortcuts'         => 1,
-			'block_devtools'          => 1,
+			'block_devtools'          => 0, // Since 2.3: cosmetic, it stops no bot; on in the Strict / Maximum presets.
 			'block_image_drag'        => 1,
 			'block_text_drag'         => 1,
 			'blur_on_capture'         => 0,
@@ -298,9 +324,10 @@ final class PNCP_Options {
 			'block_framing'           => 1,
 			'tdm_reservation'         => 1,
 			'tdm_policy_url'          => '',
-			'rate_limit'              => 0,
-			'rate_limit_search'       => 0,
-			'rate_limit_rest'         => 0,
+			// Since 2.3 new installs start with the Balanced limits; existing sites keep their stored values.
+			'rate_limit'              => 60,
+			'rate_limit_search'       => 20,
+			'rate_limit_rest'         => 60,
 			'ban_strikes'             => 3,
 			'ban_minutes'             => 60,
 			'log_retention'           => '7',
@@ -341,7 +368,6 @@ final class PNCP_Options {
 			'block_image_drag'    => 1,
 			'block_text_drag'     => 1,
 			'block_shortcuts'     => 1,
-			'block_devtools'      => 1,
 		);
 		return array(
 			'balanced' => array_merge(
@@ -369,6 +395,7 @@ final class PNCP_Options {
 					'feed_mode'               => 'excerpt',
 					'require_browser_headers' => 0,
 					'blur_on_capture'         => 0,
+					'block_devtools'          => 1,
 					'rate_limit'              => 40,
 					'rate_limit_search'       => 10,
 					'rate_limit_rest'         => 30,
@@ -385,6 +412,7 @@ final class PNCP_Options {
 					'feed_mode'               => 'disabled',
 					'require_browser_headers' => 1,
 					'blur_on_capture'         => 1,
+					'block_devtools'          => 1,
 					'rate_limit'              => 30,
 					'rate_limit_search'       => 6,
 					'rate_limit_rest'         => 20,

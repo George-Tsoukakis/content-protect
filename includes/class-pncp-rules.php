@@ -62,7 +62,15 @@ final class PNCP_Rules {
 	 * @return string[]
 	 */
 	private static function allowed() {
-		return array_merge( PNCP_Options::parse_list( PNCP_Options::get()['allow_list'] ), PNCP_Options::allowed_ai_search() );
+		$out = array();
+		foreach ( PNCP_Options::parse_list( PNCP_Options::get()['allow_list'] ) as $entry ) {
+			$entry = PNCP_Options::split_allow_entry( $entry );
+			// Entries tied to IPs are checked by WordPress: server rules cannot combine User-Agent and IP here.
+			if ( ! $entry['pinned'] && '' !== $entry['ua'] ) {
+				$out[] = $entry['ua'];
+			}
+		}
+		return array_merge( $out, PNCP_Options::allowed_ai_search() );
 	}
 
 	/**

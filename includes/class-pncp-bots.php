@@ -212,7 +212,7 @@ final class PNCP_Bots {
 			return self::verdict( 403, 'fake_crawler', $ip );
 		}
 
-		$allowed_ua = '' !== $ua && self::ua_in_list( $ua, array_merge( PNCP_Options::parse_list( $s['allow_list'] ), PNCP_Options::allowed_ai_search() ) );
+		$allowed_ua = '' !== $ua && ( self::allow_list_match( $ua, $ip, $s ) || self::ua_in_list( $ua, PNCP_Options::allowed_ai_search() ) );
 
 		if ( ! empty( $s['block_bots'] ) && ! $allowed_ua ) {
 			if ( '' === trim( $ua ) && ! empty( $s['block_empty_ua'] ) ) {
@@ -331,6 +331,28 @@ final class PNCP_Bots {
 	public static function ua_in_list( $ua, $needles ) {
 		foreach ( $needles as $needle ) {
 			if ( '' !== $needle && false !== stripos( $ua, $needle ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Does the request match an "always allowed" entry? An entry tied to IPs ("Skroutz@203.0.113.0/24")
+	 * counts only from those IPs, and only when the IP cannot be spoofed (not "trust every proxy").
+	 *
+	 * @param string               $ua User-Agent.
+	 * @param string               $ip IP.
+	 * @param array<string, mixed> $s  Settings.
+	 * @return bool
+	 */
+	public static function allow_list_match( $ua, $ip, $s ) {
+		foreach ( PNCP_Options::parse_list( $s['allow_list'] ) as $entry ) {
+			$entry = PNCP_Options::split_allow_entry( $entry );
+			if ( '' === $entry['ua'] || false === stripos( $ua, $entry['ua'] ) ) {
+				continue;
+			}
+			if ( ! $entry['pinned'] || ( PNCP_Ip::reliable() && PNCP_Ip::in_any( $ip, $entry['ips'] ) ) ) {
 				return true;
 			}
 		}

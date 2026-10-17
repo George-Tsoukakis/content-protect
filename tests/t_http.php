@@ -147,6 +147,28 @@ list( $code ) = req( $url, array( 'X-Test-IP' => '198.51.100.4', 'User-Agent' =>
 t( 'facebookexternalhit (πάντα επιτρεπτό): 200', 200 === $code, (string) $code );
 t( 'αρχείο: bot_ua, bot_ua, empty_ua', array( 'bot_ua', 'bot_ua', 'empty_ua' ) === log_reasons(), implode( ',', log_reasons() ) );
 
+/* ---------- 2.3: προεπιλογές νέων εγκαταστάσεων, «πάντα επιτρεπτοί» δεμένοι σε IP ---------- */
+$d = PNCP_Options::defaults();
+t( 'νέα εγκατάσταση: όρια ενεργά (60 / 20 / 60), DevTools ανενεργό', 60 === $d['rate_limit'] && 20 === $d['rate_limit_search'] && 60 === $d['rate_limit_rest'] && 0 === $d['block_devtools'] );
+$p = PNCP_Options::profiles();
+t( 'προφίλ: DevTools μόνο σε Αυστηρό / Μέγιστο', ! isset( $p['balanced']['block_devtools'] ) && 1 === $p['strict']['block_devtools'] && 1 === $p['maximum']['block_devtools'] );
+fresh();
+settings( array( 'require_browser_headers' => 1, 'allow_list' => "PriceBot@198.51.100.50, 198.51.100.60/31\nSkroutz\nBadEntry@not-an-ip" ) );
+$pb = array( 'User-Agent' => 'PriceBot/1.0' );
+list( $code ) = req( $url, $pb + array( 'X-Test-IP' => '198.51.100.50' ) );
+t( 'PriceBot@IP από τη σωστή IP: 200', 200 === $code, (string) $code );
+list( $code ) = req( $url, $pb + array( 'X-Test-IP' => '198.51.100.61' ) );
+t( 'PriceBot@IP από IP μέσα στο CIDR: 200', 200 === $code, (string) $code );
+list( $code ) = req( $url, $pb + array( 'X-Test-IP' => '198.51.100.70' ) );
+t( 'PriceBot@IP από άλλη IP: 403 (Μόνο browsers)', 403 === $code, (string) $code );
+list( $code ) = req( $url, array( 'User-Agent' => 'Skroutz/2.0', 'X-Test-IP' => '198.51.100.71' ) );
+t( 'Skroutz χωρίς @: από οποιαδήποτε IP, όπως πριν', 200 === $code, (string) $code );
+list( $code ) = req( $url, array( 'User-Agent' => 'BadEntry/1.0', 'X-Test-IP' => '198.51.100.72' ) );
+t( 'γραμμή με @ χωρίς έγκυρη IP: δεν γίνεται ποτέ δεκτή', 403 === $code, (string) $code );
+t( 'κανόνες server: οι γραμμές με @ δεν μπαίνουν στη λίστα επιτρεπτών', false === strpos( PNCP_Rules::nginx() . PNCP_Rules::apache() . wp_json_encode( PNCP_Rules::cloudflare() ), 'PriceBot' ) && false !== strpos( PNCP_Rules::nginx(), 'Skroutz' ) );
+settings( array( 'require_browser_headers' => 0, 'allow_list' => PNCP_Options::default_allow_list() ) );
+fresh();
+
 /* ---------- Ψεύτικο / πραγματικό Googlebot ---------- */
 $gb = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
 list( $code ) = req( $url, array( 'X-Test-IP' => '45.1.2.3', 'User-Agent' => $gb, 'X-Test-RDNS' => 'scraper.example.net' ) );
